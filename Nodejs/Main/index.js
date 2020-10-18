@@ -19,3 +19,10 @@ app.get('/', (req, res) => {
     res.render('index');
 }).listen(7000);
 
+io.on("connection", (socket)=>{
+    socket.on("Ghost Move", (board, x,y)=>{
+        board[x][y] = 2;
+        return session.query(`move_ghost(${board}, Move).`);
+    })
+})
+
