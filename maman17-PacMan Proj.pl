@@ -23,8 +23,9 @@
 :- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord).
 :- dynamic game_level/1.     % numerator for difining the game level.
 :- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
-
-
+:- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit)
+:- dynamic max_depth/2. % BoardID -> max_depth
+:- dynamic lat_defined/1 % the last BoardID defined
 /*****************************
 * List of clues for the game *
 *****************************/
@@ -600,4 +601,18 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
-*/
+make_move(BoardID, coordinate(I,J), coordinate(X,Y)):-.
+copy_board(BoardID, NewBoardId):-.
+ligal_move(BoardID, coordinate(I,J), coordinate(X,Y)):-.
+moves(BoardID, coordinate(I,J), AllPossibleMoves):-
+	setof(coordinate(X,Y), ligal_move(BoardID, coordinate(I,J), coordinate(X,Y)), AllPossibleMoves).
+
+alphabeta(BoardID, Alpha, Beta, Level, Val):-
+	retract(max_depth(BoardID, M_depth)), Level < M_depth,
+	retract(game_stat(BoardID, _, _, G1_C, G2_C, G3_C)),
+	ligal_move(BoardID, G1_C, G1_C_new), ligal_move(BoardID, G2_C, G2_C_new), ligal_move(BoardID, G3_C, G3_C_new),
+	retract(lat_defined(Last)), copy_board(BoardID, Last+1), copy_board(BoardID, Last+2), copy_board(BoardID, Last+3),
+	assert(lat_defined(Last+3)) .
+
+
+
