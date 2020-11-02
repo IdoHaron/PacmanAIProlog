@@ -20,7 +20,7 @@
 :- dynamic slot/3.	     % slot(BoardID,coordinate(I,J),ValueOnThisSlot).
 :- dynamic next_board_no/1.  % numerator for managing grid id's.
 :- dynamic player_stuck/1.   % flag indicating this player has no legal moves.
-:- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord).
+:- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord), BoardID = 0 is game board.
 :- dynamic game_level/1.     % numerator for difining the game level.
 :- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
 
@@ -507,8 +507,7 @@ move_validate(BoardNo,Move):-
 	NewX >=1,
 	NewY =< 20,
 	NewY >=1,
-	slot(BoardNo,coordinate(NewX,NewY),Val),
-	not(member(Val,['\u25A0'])).
+	not_wall(BoardNo, NewX, NewY).
 
 
 
@@ -602,27 +601,89 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 */
+not_wall(BoardID, coordinate(X,Y)):-
+	slot(BoardID, coordinate(X, Y),Val),
+	not(member(Val,['\u25A0'])).
+
 possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	Z is X, W is Y,
-	member(Dir, [up, down, left, right]),
-	(
-		Dir=:=up, Y is Y+1, Y<=21;
+	member(Dir, [up, down, left, right]), % choosing a direction.
+	( % exprassing in the variables the choosen direction and adding the fitting limitations based on the board.
+		Dir=:=up, Y is Y+1, Y<21; 
 		Dir=:=down, Y is Y-1, Y>0;
 		Dir=:=left, X is X-1, X>0;
-		Dir=:=right, X is X+1, X<21
-	)
+		Dir=:=right, X is X+1, X<=21
+	),
 	(
 		IsGhost, not_wall(BoardID, coordinate(X, Y)), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)), !;
 		not(IsGhost), not(not_wall(BoardID, coordinate(X, Y))), !;
 		not(IsGhost), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)),!
 	 ).
 
-ligal_move(BoardID, IsGhost, PossibleMove):-
+single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
 	retract(game_stat(BoardID, _, P, G1, G2,G3)), IsGhost,
 	 (possible_move(BoardID, IsGhost,G1, N_G1), possible_move(BoardID, IsGhost,G2, N_G2),possible_move(BoardID, IsGhost,G3, N_G3)),
-	 PossibleMove is [[G1, N_G1], [G2, N_G2], [G3, N_G3]], !
-	  !
+	 PossibleMove is [[G1, N_G1], [G2, N_G2], [G3, N_G3]], ! % returns a list of lists each containing original and new cords.
 	;
-	(possible_move(BoardID, IsGhost, P, N_P) ), PossibleMove is [[P, N_P]].  
-moves(BoardID, IsGhost, AllPossibleMoves):-
-	setof(R, ligal_move(BoardID, IsGhost, false, R), AllPossibleMoves).
+	(possible_move(BoardID, IsGhost, P, N_P) ), PossibleMove is [[P, N_P]]. 
+ 
+moves(BoardID, IsGhostTurn, AllPossibleMoves):-
+	setof(R, single_move(BoardID, IsGhostTurn, R), AllPossibleMoves). % returns all possible moves in this turn
+
+%% alphabeta
+
+ghosts_to_move(pos(_,1,_)). % true iff it's MAX turn to move  (x player)
+pacman_to_move(pos(_,2,_)). % true iff it's MIN turn to move  (o player)
+
+
+
+
+alphabeta(CurrentPos,Alpha,Beta,BestSuccessorPos,Val,DepthLevel):-
+
+	(
+	   (
+              (nonvar(Alpha),nonvar(Beta));
+              (Alpha is -999999, Beta is 999999) % init +-infinity
+            ),
+	 game_level(Level),
+         MaxDepth is Level + 2,
+         moves(CurrentPos,PosList,DepthLevel,MaxDepth),!,
+	 NewDepthLevel is DepthLevel+1,	% update depth level
+	 boundedbest(PosList,Alpha,Beta,BestSuccessorPos,Val,NewDepthLevel)
+	)
+	;
+	staticval(CurrentPos,Val). % terminal seatchtree node - evaluate directly
+
+boundedbest([Pos|PosList],Alpha,Beta,GoodPos,GoodVal,DepthLevel):-
+	alphabeta(Pos,Alpha,Beta,_,Val,DepthLevel),
+	goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel).
+
+goodenough([],_,_,Pos,Val,Pos,Val,_):- !.	% No other candidate
+
+goodenough(_,Alpha,Beta,Pos,Val,Pos,Val,_):-
+	ghosts_to_move(Pos),Val > Beta, !          % Maximizer attained upper bound
+	;
+	pacman_to_move(Pos),Val < Alpha, !.        % Minimizer attained lower bound
+
+goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel):-
+	newbounds(Alpha,Beta,Pos,Val,NewAlpha,NewBeta),   % Refine bounds
+	boundedbest(PosList,NewAlpha,NewBeta,Pos1,Val1,DepthLevel),
+	betterof(Pos,Val,Pos1,Val1,GoodPos,GoodVal).
+
+/* define new interval by 2 last arguments that is narrower or equal to old interval */
+newbounds(Alpha,Beta,Pos,Val,Val,Beta):-
+	ghosts_to_move(Pos),Val > Alpha, !.       % Maximizer increased lower bound
+
+newbounds(Alpha,Beta,Pos,Val,Alpha,Val):-
+	pacman_to_move(Pos),Val < Beta, !.         % Minimizer decreased upper bound
+
+newbounds(Alpha,Beta,_,_,Alpha,Beta).      % Otherwise bounds unchanged
+
+% betterof(Pos,Val,Pos1,Val1,Pos,Val)     % Pos better than Pos1
+betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
+	ghosts_to_move(Pos),Val > Val1, !
+	;
+	pacman_to_move(Pos), Val < Val1, !.
+
+betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
+
