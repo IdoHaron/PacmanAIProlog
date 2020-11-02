@@ -606,10 +606,10 @@ possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	Z is X, W is Y,
 	member(Dir, [up, down, left, right]),
 	(
-		Dir=up, Y is Y+1;
-		Dir=down, Y is Y-1, Y>=0;
-		Dir=left, X is X-1, X>=0;
-		Dir=right, X is X+1 
+		Dir=:=up, Y is Y+1;
+		Dir=:=down, Y is Y-1, Y>=0;
+		Dir=:=left, X is X-1, X>=0;
+		Dir=:=right, X is X+1 
 	)
 	(
 		IsGhost, not_wall(BoardID, coordinate(X, Y)), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)), !;
