@@ -584,6 +584,7 @@ goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel,MaxDepth,Level)
 	betterof(Pos,Val,Pos1,Val1,GoodPos,GoodVal).
 
 /* define new interval by 2 last arguments that is narrower or equal to old interval */
+/*
 newbounds(Alpha,Beta,Pos,Val,Val,Beta):-
 	min_to_move(Pos),Val > Alpha, !.       % Maximizer increased lower bound
 
@@ -601,3 +602,26 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 */
+
+move(BoardID, IsGhost, ToMove, AllPossibleMoves):-
+	game_stat(BoardID, _, P, G1, G2,G3),
+	(IsGhost,
+	(
+	 possible_move(BoardID, false,G1, N_G1), possible_move(BoardID, false,G2, N_G2),possible_move(BoardID, false,G3, N_G3)
+	), (
+		not(ToMove), AllPossibleMoves is [N_G1,N_G2,N_G3], !
+		; 
+		move(BoardID, G1, N_G1),move(BoardID, G2, N_G2), move(BoardID, G3, N_G3), !
+		)
+	)
+	;
+	(
+		possible_move(BoardID, true, P, N_P),
+		(
+			not(ToMove), AllPossibleMoves is N_P, !
+			; 
+			move(BoardID, P, N_P), !
+		)
+	)  
+moves(BoardID, IsGhost, AllPossibleMoves):-
+	setof(R, ligal_move(BoardID, IsGhost, false, R), AllPossibleMoves).
