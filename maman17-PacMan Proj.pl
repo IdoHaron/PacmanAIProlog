@@ -602,26 +602,27 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 */
-
-move(BoardID, IsGhost, ToMove, AllPossibleMoves):-
-	game_stat(BoardID, _, P, G1, G2,G3),
-	(IsGhost,
+possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
+	Z is X, W is Y,
+	member(Dir, [up, down, left, right]),
 	(
-	 possible_move(BoardID, false,G1, N_G1), possible_move(BoardID, false,G2, N_G2),possible_move(BoardID, false,G3, N_G3)
-	), (
-		not(ToMove), AllPossibleMoves is [N_G1,N_G2,N_G3], !
-		; 
-		move(BoardID, G1, N_G1),move(BoardID, G2, N_G2), move(BoardID, G3, N_G3), !
-		)
+		Dir=up, Y is Y+1;
+		Dir=down, Y is Y-1, Y>=0;
+		Dir=left, X is X-1, X>=0;
+		Dir=right, X is X+1 
 	)
-	;
 	(
-		possible_move(BoardID, true, P, N_P),
-		(
-			not(ToMove), AllPossibleMoves is N_P, !
-			; 
-			move(BoardID, P, N_P), !
-		)
-	)  
+		IsGhost, not_wall(BoardID, coordinate(X, Y)), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)), !;
+		not(IsGhost), not(not_wall(BoardID, coordinate(X, Y))), !;
+		not(IsGhost), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)),!
+	 ).
+
+ligal_move(BoardID, IsGhost, PossibleMove):-
+	retract(game_stat(BoardID, _, P, G1, G2,G3)), IsGhost,
+	 (possible_move(BoardID, IsGhost,G1, N_G1), possible_move(BoardID, IsGhost,G2, N_G2),possible_move(BoardID, IsGhost,G3, N_G3)),
+	 PossibleMove is [[G1, N_G1], [G2, N_G2], [G3, N_G3]], !
+	  !
+	;
+	(possible_move(BoardID, IsGhost, P, N_P) ), PossibleMove is [[P, N_P]].  
 moves(BoardID, IsGhost, AllPossibleMoves):-
 	setof(R, ligal_move(BoardID, IsGhost, false, R), AllPossibleMoves).
