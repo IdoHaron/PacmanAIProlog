@@ -607,15 +607,15 @@ copy_board(BoardID, NewBoardId):-.
 ligal_move(BoardID, coordinate(I,J), coordinate(X,Y)):-.
 moves(BoardID, coordinate(I,J), AllPossibleMoves):-
 	setof(coordinate(X,Y), ligal_move(BoardID, coordinate(I,J), coordinate(X,Y)), AllPossibleMoves).
-
-alphabeta(BoardID, isPac, Level, Val):-
+returnsMin(IsPac, Val1, Val2, Val3):-.
+alphabeta(BoardID, IsPac, Level, Val, Moves):-
 	retract(bounds(alpha, Alpha)), retract(bounds(beta, Beta)),
 	retract(max_depth(BoardID, M_depth)), Level < M_depth,
-	retract(game_stat(BoardID, _, _, G1_C, G2_C, G3_C)), uristic(BoardID, isPac, urValue),
-	(isPac, urValue>=Alpha, Alpha is urValue; not(isPac), urValue <= Beta, Beta is urValue )
+	retract(game_stat(BoardID, _, _, G1_C, G2_C, G3_C)), uristic(BoardID, IsPac, UrValue),
+	(IsPac, UrValue>=Alpha, Alpha is UrValue; not(IsPac), UrValue <= Beta, Beta is UrValue )
 	assert(bounds(alpha, Alpha)), assert(bounds(beta, Beta)),
-	ligal_move(BoardID, G1_C, G1_C_new), ligal_move(BoardID, G2_C, G2_C_new), ligal_move(BoardID, G3_C, G3_C_new),
+	(not(IsPac), ligal_move(BoardID, G1_C, G1_C_new), ligal_move(BoardID, G2_C, G2_C_new), ligal_move(BoardID, G3_C, G3_C_new),
 	retract(lat_defined(Last)), copy_board(BoardID, Last+1), copy_board(BoardID, Last+2), copy_board(BoardID, Last+3),
-	assert(lat_defined(Last+3)).
+	assert(lat_defined(Last+3)), Moves is [G1_C_new, G2_C_new, G3_C_new],  ; I  ), alphabeta(Last+1, not(IsPac), Level+1, Val).
 
 
