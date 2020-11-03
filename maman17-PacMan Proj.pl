@@ -24,7 +24,7 @@
 :- dynamic game_level/1.     % numerator for difining the game level.
 :- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
 :- dynamic def_board/1.  	% saves last saved board -> 0 is the original board.
-
+:- dynamic max_score/1  	% max game score
 /*****************************
 * List of clues for the game *
 *****************************/
@@ -114,7 +114,7 @@ select_level:-
 
 play_pacman(BoardNo):-
 	write('Select where to move(l,r,u,d):'), nl,
-	assert(def_board(last), BoardNo),
+	assert(def_board(BoardNo)),
 	read(Move),
 	not(check_exit(BoardNo,Move)),
 	(   move(BoardNo,Move),
@@ -608,11 +608,14 @@ copy_boards_row(Board1,Board2, coordinate(X, Y)):- % copies each row it recieves
 	assert(slot(Board1, X, Y), New), assert(slot(Board2, X, Y), New),
 	X is X+1, copy_boards_row(Board1,Board2, coordinate(X, Y)).
 
-copy_boards(Board1,Board2, coordinate(X, Y)):- % runs on each colum, and copies each row using external func
+copy_boards_line(Board1,Board2, coordinate(X, Y)):- % runs on each colum, and copies each row using external func
 	ligal_cords(coordinate(X, Y)),
 	copy_boards_row(Board1, Board2, coordinate(X, Y)), 
-	Y is Y+1, copy_boards(Board1,Board2, coordinate(X, Y)) . 
+	Y is Y+1, copy_boards_line(Board1,Board2, coordinate(X, Y)) . 
 
+copy_boards(Board1,Board2):-
+	retract(game_stat(Board1, S, P, G1,G2,G3)), assert(game_stat(Board2, S, P, G1,G2,G3)), assert(game_stat(Board1, S, P, G1,G2,G3)),
+	copy_boards_line(Board1, Board2, coordinate(1,1)).
 
 move_cords(BoardID, coordinate(OrigX, OrigY), coordinate(X, Y)):-
 	retract(slot(BoardID, OrigX, OrigY), Origin), retract(slot(BoardID, X, Y), New),
@@ -628,8 +631,8 @@ possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	 ).
 
 single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
-	retract(game_stat(BoardID, _, P, G1, G2,G3)), retract(def_board(final), NewBoard), NewBoard is NewBoard+1,
-	copy_board(BoardID, NewBoard, coordinate(1,1)), assert(def_board(final), NewBoard),
+	retract(game_stat(BoardID, _, P, G1, G2,G3)), retract(def_board(NewBoard)), NewBoard is NewBoard+1,
+	copy_boards(BoardID, NewBoard), assert(def_board(NewBoard)),
 	 (
 		IsGhost, (possible_move(NewBoard, IsGhost,G1, N_G1), possible_move(NewBoard, IsGhost,G2, N_G2),possible_move(NewBoard, IsGhost,G3, N_G3)),
 	 	PossibleMove is NewBoard, ! % returns a list of lists each containing original and new cords.
@@ -640,6 +643,24 @@ single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
 moves(BoardID, IsGhostTurn, AllPossibleMoves):-
 	setof(R, single_move(BoardID, IsGhostTurn, R), AllPossibleMoves). % returns all possible moves in this turn
 
+ghost_avreage_dis(Board, Dis):-
+	.
+ghost_rectangel(Board, Rec):-.
+pacman_in_cannal(Board, IsInCannal):-.
+
+staticval(Board, Val):-
+	retract(game_level(Level)), assert(game_level(Level)), 
+	retract(max_score(Max)), assert(max_score(Max)),
+	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
+	(
+		Score = Max, Val is 1000, !
+		;
+		Level=1, ghost_avreage_dis(Board, Dis), Val is 0.6*Score+4*Dis, !
+		;
+		Level=2,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec), Val is 0.6*Score +3*Dis - Rec, !
+		;
+		Level=3,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec),pacman_in_cannal(Board, IsInCannal) Val is 0.6*Score +3*Dis - Rec -100*IsInCannal, !
+	).
 %% alphabeta
 
 ghosts_to_move(pos(_,1,_)). % true iff it's MAX turn to move  (x player)
