@@ -30,15 +30,15 @@
 *****************************/
 
 %Translating player choice of move to coordinate influance.
-move(l,-1,0).
-move(r,1,0).
-move(u,0,1).
-move(d,0,-1).
+directions(l,-1,0).
+directions(r,1,0).
+directions(u,0,1).
+directions(d,0,-1).
 
 %Translate items on board to their value.
-score('o',10).
-score('c',200).
-score(' ',0).
+scores('o',10).
+scores('c',200).
+scores(' ',0).
 
 
 
@@ -497,17 +497,17 @@ print_score(BoardNo):-
 *      2 - False if not legal move. *
 ************************************/
 
-move_validate(BoardNo,Move):-
-	member(Move,[l,r,u,d]),
-	move(Move,MoveX,MoveY),
-	game_stat(BoardNo,_,coordinate(X,Y),_,_,_),
-	NewX is X + MoveX,
-	NewY is Y + MoveY,
-	NewX =< 21,
-	NewX >=1,
-	NewY =< 20,
-	NewY >=1,
-	not_wall(BoardNo, NewX, NewY).
+ligal_place(BoardID, coordinate(X,Y)):-
+	slot(BoardID, coordinate(X, Y),Val),
+	not(member(Val,['\u25A0','P','G'])).
+ligal_cords(coordinate(X,Y)):-
+	X =< 21,
+	X >=1,
+	Y =< 20,
+	Y >=1,
+move_validate(BoardNo,coordinate(NewX,NewY)):-
+	ligal_cords(coordinate(NewX,NewY)),
+	ligal_place(BoardNo, NewX, NewY).
 
 
 
@@ -601,31 +601,39 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 */
-not_wall(BoardID, coordinate(X,Y)):-
-	slot(BoardID, coordinate(X, Y),Val),
-	not(member(Val,['\u25A0'])).
+copy_boards_row(Board1,Board2, coordinate(X, Y)):- % copies each row it recieves
+	ligal_cords(coordinate(X, Y)),
+	retract(slot(Board1, X,Y), _), retract(slot(Board2, X, Y), New),
+	assert(slot(Board1, X, Y), New), assert(slot(Board2, X, Y), New),
+	X is X+1, copy_boards_row(Board1,Board2, coordinate(X, Y)).
+
+copy_boards(Board1,Board2, coordinate(X, Y)):- % runs on each colum, and copies each row using external func
+	ligal_cords(coordinate(X, Y)),
+	copy_boards_row(Board1, Board2, coordinate(X, Y)), 
+	Y is Y+1, copy_boards(Board1,Board2, coordinate(X, Y)) . 
+
+
+move_cords(BoardID, coordinate(OrigX, OrigY), coordinate(X, Y)):-
+	retract(slot(BoardID, OrigX, OrigY), Origin), retract(slot(BoardID, X, Y), New),
+	assert(slot(BoardID, OrigX, OrigY), New), assert(slot(BoardID, X, Y), Origin).
 
 possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	Z is X, W is Y,
-	member(Dir, [up, down, left, right]), % choosing a direction.
-	( % exprassing in the variables the choosen direction and adding the fitting limitations based on the board.
-		Dir=:=up, Y is Y+1, Y<21; 
-		Dir=:=down, Y is Y-1, Y>0;
-		Dir=:=left, X is X-1, X>0;
-		Dir=:=right, X is X+1, X<=21
-	),
+	directions(Dir, XAdder, YAdder), % choosing a direction.
 	(
-		IsGhost, not_wall(BoardID, coordinate(X, Y)), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)), !;
-		not(IsGhost), not(not_wall(BoardID, coordinate(X, Y))), !;
-		not(IsGhost), Z is X, W is Y, move(BoardID, coordinate(X, Y), coordinate(Z, W)),!
+		X is X+ XAdder, Y is Y + YAdder,
+		not(IsGhost), not(ligal_place(BoardID, coordinate(X, Y))), !; %% if there is a wall there, not out of bound use the original cords
+		move_validate(BoardID, coordinate(X,Y)), move_cords(BoardID, coordinate(Z,W), coordinate(X,Y)), Z is X, W is Y
 	 ).
 
 single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
-	retract(game_stat(BoardID, _, P, G1, G2,G3)), IsGhost,
-	 (possible_move(BoardID, IsGhost,G1, N_G1), possible_move(BoardID, IsGhost,G2, N_G2),possible_move(BoardID, IsGhost,G3, N_G3)),
-	 PossibleMove is [[G1, N_G1], [G2, N_G2], [G3, N_G3]], ! % returns a list of lists each containing original and new cords.
-	;
-	(possible_move(BoardID, IsGhost, P, N_P) ), PossibleMove is [[P, N_P]]. 
+	retract(game_stat(BoardID, _, P, G1, G2,G3)),copy_board(BoardID, NewBoard, coordinate(1,1)),
+	 (
+		IsGhost, (possible_move(NewBoard, IsGhost,G1, N_G1), possible_move(NewBoard, IsGhost,G2, N_G2),possible_move(NewBoard, IsGhost,G3, N_G3)),
+	 	PossibleMove is NewBoard, ! % returns a list of lists each containing original and new cords.
+		;
+		( possible_move(NewBoard, IsGhost, P, N_P) ), PossibleMove is NewBoard
+	). 
  
 moves(BoardID, IsGhostTurn, AllPossibleMoves):-
 	setof(R, single_move(BoardID, IsGhostTurn, R), AllPossibleMoves). % returns all possible moves in this turn
