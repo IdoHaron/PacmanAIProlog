@@ -644,6 +644,8 @@ moves(BoardID, IsGhostTurn, AllPossibleMoves):-
 	setof(R, single_move(BoardID, IsGhostTurn, R), AllPossibleMoves). % returns all possible moves in this turn
 
 ghost_avreage_dis(Board, Dis):-
+	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
+	Dis is float((abs(float((P-G1)/2))+abs(float((P-G2)/2))+abs(float((P-G3)/2)))/3)
 	.
 ghost_rectangel(Board, Rec):-.
 pacman_in_cannal(Board, IsInCannal):-.
@@ -654,6 +656,8 @@ staticval(Board, Val):-
 	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
 	(
 		Score = Max, Val is 1000, !
+		; 
+		(P = G1 ; P= G2; P = G3), Val is -1000, !
 		;
 		Level=1, ghost_avreage_dis(Board, Dis), Val is 0.6*Score+4*Dis, !
 		;
