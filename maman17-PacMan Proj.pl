@@ -24,7 +24,7 @@
 :- dynamic game_level/1.     % numerator for difining the game level.
 :- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
 :- dynamic def_board/1.  	% saves last saved board -> 0 is the original board.
-:- dynamic max_score/1  	% max game score
+:- dynamic max_biscits/1  	% max game score
 /*****************************
 * List of clues for the game *
 *****************************/
@@ -182,7 +182,8 @@ cleanup:-
 initiate_board:-
 	initiate_board(1,1,1),
 	assert(next_board_no(2)),
-	assert(biscits(185,1,1,1))
+	assert(biscits(185,1,1,1)),
+	assert(max_biscits(185))
 	.
 
 
@@ -499,19 +500,24 @@ print_score(BoardNo):-
 ************************************/
 not_wall(BoardID, coordinate(X,Y)):-
 	slot(BoardID, coordinate(X, Y),Val), 
-	not(member(Val,['\u25A0','P','G'])).
+	not(member(Val,['\u25A0'])).
 
-ligal_place(BoardID, coordinate(X,Y)):-
+ligal_place(BoardID, IsPac, coordinate(X,Y)):-
 	slot(BoardID, coordinate(X, Y),Val),
-	not(member(Val,['\u25A0','P','G'])).
+	(
+		IsPac, not(member(Val,['\u25A0','G'])),!
+		;
+		not(IsPac), not(member(Val,['\u25A0','P']), !
+	).
+
 ligal_cords(coordinate(X,Y)):-
 	X =< 21,
 	X >=1,
 	Y =< 20,
 	Y >=1,
-move_validate(BoardNo,coordinate(NewX,NewY)):-
+move_validate(BoardNo, IsPac,coordinate(NewX,NewY)):-
 	ligal_cords(coordinate(NewX,NewY)),
-	ligal_place(BoardNo, NewX, NewY).
+	ligal_place(BoardNo, IsPac,NewX, NewY).
 
 
 
