@@ -497,6 +497,9 @@ print_score(BoardNo):-
 *      1 - True if legal move.      *
 *      2 - False if not legal move. *
 ************************************/
+not_wall(BoardID, coordinate(X,Y)):-
+	slot(BoardID, coordinate(X, Y),Val), 
+	not(member(Val,['\u25A0','P','G'])).
 
 ligal_place(BoardID, coordinate(X,Y)):-
 	slot(BoardID, coordinate(X, Y),Val),
@@ -648,10 +651,34 @@ ghost_avreage_dis(Board, Dis):-
 	Dis is float((abs(float((P-G1)/2))+abs(float((P-G2)/2))+abs(float((P-G3)/2)))/3)
 	.
 ghost_rectangel(Board, Rec):-.
-pacman_in_cannal(Board, IsInCannal):-.
+
+pacman_in_cannal_step(Board, coordinate(X, Y)):-
+	retract(turn_num(TurnsLeft)), TurnsLeft>=0, assert(turn_num(TurnsLeft)), TurnsTaken is 0,
+	retract(game_stat(Board, Score, P, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3))), assert(game_stat(Board, Score, P, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3))),
+	(
+		(X=X1, Y=Y1; X =X2, Y = Y2 ; X = X3, Y = Y3)
+		;
+		W is X+1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(W, Y))
+		;
+		W is X-1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(W, Y))
+		;
+		Z is Y+1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(X, Z))
+		;
+		Z is Y-1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(X, Z))
+	).
+pacman_in_cannal(Board, IsInCannal):-
+	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
+	pacman_in_cannal_step(Board, P), IsInCannal = 1, !
+	;
+	IsInCannal = 0
+	.
 
 staticval(Board, Val):-
-	retract(game_level(Level)), assert(game_level(Level)), 
+	retract(game_level(Level)), assert(game_level(Level)),
 	retract(max_score(Max)), assert(max_score(Max)),
 	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
 	(
