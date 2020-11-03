@@ -23,7 +23,7 @@
 :- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord), BoardID = 0 is game board.
 :- dynamic game_level/1.     % numerator for difining the game level.
 :- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
-
+:- dynamic def_board/1.  	% saves last saved board -> 0 is the original board.
 
 /*****************************
 * List of clues for the game *
@@ -114,6 +114,7 @@ select_level:-
 
 play_pacman(BoardNo):-
 	write('Select where to move(l,r,u,d):'), nl,
+	assert(def_board(last), BoardNo),
 	read(Move),
 	not(check_exit(BoardNo,Move)),
 	(   move(BoardNo,Move),
@@ -627,7 +628,8 @@ possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	 ).
 
 single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
-	retract(game_stat(BoardID, _, P, G1, G2,G3)),copy_board(BoardID, NewBoard, coordinate(1,1)),
+	retract(game_stat(BoardID, _, P, G1, G2,G3)), retract(def_board(final), NewBoard), NewBoard is NewBoard+1,
+	copy_board(BoardID, NewBoard, coordinate(1,1)), assert(def_board(final), NewBoard),
 	 (
 		IsGhost, (possible_move(NewBoard, IsGhost,G1, N_G1), possible_move(NewBoard, IsGhost,G2, N_G2),possible_move(NewBoard, IsGhost,G3, N_G3)),
 	 	PossibleMove is NewBoard, ! % returns a list of lists each containing original and new cords.
