@@ -656,7 +656,9 @@ ghost_avreage_dis(Board, Dis):-
 	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
 	Dis is float((abs(float((P-G1)/2))+abs(float((P-G2)/2))+abs(float((P-G3)/2)))/3)
 	.
-ghost_rectangel(Board, Rec):-.
+ghost_rectangel(Board, Rec):-
+	game_stat(Board, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
+	Rec is 0.5*abs(X1*(Y3-Y2)+X2(Y1-Y3)+X3(Y2-Y1)).
 
 pacman_in_cannal_step(Board, coordinate(X, Y)):-
 	retract(turn_num(TurnsLeft)), TurnsLeft>=0, assert(turn_num(TurnsLeft)), TurnsTaken is 0,
