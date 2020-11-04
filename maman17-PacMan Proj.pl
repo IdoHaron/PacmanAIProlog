@@ -686,11 +686,12 @@ pacman_in_cannal(Board, IsInCannal):-
 	.
 
 staticval(Board, Val):-
-	retract(game_level(Level)), assert(game_level(Level)),
-	retract(max_score(Max)), assert(max_score(Max)),
-	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
+	game_level(Level),
+	max_biscits(Max),
+	game_stat(Board, _, P, G1, G2, G3),
+	biscits(Biscits, _, _, _),
 	(
-		Score = Max, Val is 1000, !
+		Biscits = Max, Val is 1000, !
 		; 
 		(P = G1 ; P= G2; P = G3), Val is -1000, !
 		;
