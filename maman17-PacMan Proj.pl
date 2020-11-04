@@ -22,7 +22,7 @@
 :- dynamic player_stuck/1.   % flag indicating this player has no legal moves.
 :- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord), BoardID = 0 is game board.
 :- dynamic game_level/1.     % numerator for difining the game level.
-:- dynamic biscits/4.        % biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
+:- dynamic biscits/5.        % BoardID,biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
 :- dynamic def_board/1.  	% saves last saved board -> 0 is the original board.
 :- dynamic max_biscits/1  	% max game score
 /*****************************
@@ -114,22 +114,18 @@ select_level:-
 
 play_pacman(BoardNo):-
 	write('Select where to move(l,r,u,d):'), nl,
-	assert(def_board(BoardNo)),
 	read(Move),
 	not(check_exit(BoardNo,Move)),
 	(   move(BoardNo,Move),
 	    print_board(BoardNo),
 	    print_score(BoardNo),
-	    biscits(Val,_,_,_),
+	    biscits(BoardNo,Val,_,_,_),
 	    write(Val),nl,
-	    play_pacman(BoardNo)	)
-	;
-	(
-	    print_board(BoardNo),
-	    print_score(BoardNo),
-	    biscits(Val,_,_,_),
-	    write(Val),nl,
-	    play_pacman(BoardNo)
+		(
+			Val =0, print('you won!'),!
+			;
+			play_pacman(BoardNo)
+		)
 	).
 
 
@@ -169,7 +165,7 @@ cleanup:-
 	retractall(player_stuck(_)),
         retractall(game_stat(_,_,_,_,_,_)),
 	retractall(game_level(_)),
-	retractall(biscits(_,_,_,_))
+	retractall(biscits(_,_,_,_,_))
 	.
 
 
@@ -180,9 +176,9 @@ cleanup:-
 ********************************/
 
 initiate_board:-
-	initiate_board(1,1,1),
-	assert(next_board_no(2)),
-	assert(biscits(185,1,1,1)),
+	initiate_board(0,1,1),
+	assert(next_board_no(1)),
+	assert(biscits(0,185,1,1,1)),
 	assert(max_biscits(185))
 	.
 
@@ -543,9 +539,9 @@ make_move(BoardNo,Move):-
 	retract(slot(BoardNo,coordinate(Xcord,Ycord),_)),
 	assert(slot(BoardNo,coordinate(Xcord,Ycord),' ')),
 	Val='o',
-	retract(biscits(Val2,_,_,_)),
+	retract(biscits(BoardNo,Val2,_,_,_)),
 	NewVal2 is Val2 -1,
-	assert(biscits(NewVal2,_,_,_))
+	assert(biscits(BoardNo, NewVal2,_,_,_))
 	.
 
 
@@ -626,9 +622,63 @@ copy_boards(Board1,Board2):-
 	retract(game_stat(Board1, S, P, G1,G2,G3)), assert(game_stat(Board2, S, P, G1,G2,G3)), assert(game_stat(Board1, S, P, G1,G2,G3)),
 	copy_boards_line(Board1, Board2, coordinate(1,1)).
 
-move_cords(BoardID, coordinate(OrigX, OrigY), coordinate(X, Y)):-
-	retract(slot(BoardID, OrigX, OrigY), Origin), retract(slot(BoardID, X, Y), New),
-	assert(slot(BoardID, OrigX, OrigY), New), assert(slot(BoardID, X, Y), Origin).
+move_cords(BoardID, IsGhost, coordinate(OrigX, OrigY), coordinate(X, Y)):-
+	IsGhost, 
+	(
+		
+		)
+	retract(slot(BoardID, coordinate(OrigX, OrigY), Origin)), retract(slot(BoardID, coordinate(X, Y), New)),assert(slot(BoardID, coordinate( X, Y), Origin)),
+	(
+		IsGhost,(
+				game_stat(BoardID, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
+				(
+					OrigX=X1, OrigY = Y1, (
+						biscits(BoardID, _, 1, _, _), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
+						;
+						biscits(BoardID, _, 0, _, _)
+						), (
+							New= 'o', retract(biscit(BoardID, B,G1, G2, G3)), assert(biscit(BoardID, B, 1, G2, G3))
+							;
+							New = ' '
+						)
+					;
+					OrigX=X2, OrigY = Y2, 
+					(
+						biscits(BoardID, _, _, 1, _), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
+						;
+						biscits(BoardID, _, _, 0, _)
+					),
+					(
+						New= 'o', retract(biscit(BoardID, B,G1, G2, G3)), assert(biscit(BoardID, B,G1, 1, G3))
+					;
+						New = ' '
+					)
+					;
+					OrigX=X3, OrigY = Y3, 
+					(
+						biscits(BoardID, _, _, _, 1), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
+						;
+						biscits(BoardID, _, _, _, 0)
+					),
+					(
+						New= 'o', retract(biscit(BoardID,B, G1, G2, G3)), assert(biscit(BoardID,B, G1, G2, 1))
+						;
+						New = ' '
+					)
+				)
+			), !
+		;
+		not(IsGhost),
+		(
+			assert(slot(BoardID, coordinate(OrigX, OrigY), ' ')),
+			(
+					New = ' '
+					;
+					New = 'o', retract(biscits(BoardID, Val, G1,G2,G3)), Val is Val-1, assert(biscits(BoardID, Val, G1,G2,G3))
+			)
+		)
+	)
+	.
 
 possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	Z is X, W is Y,
@@ -636,7 +686,7 @@ possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	(
 		X is X+ XAdder, Y is Y + YAdder,
 		not(IsGhost), not(ligal_place(BoardID, coordinate(X, Y))), !; %% if there is a wall there, not out of bound use the original cords
-		move_validate(BoardID, coordinate(X,Y)), move_cords(BoardID, coordinate(Z,W), coordinate(X,Y)), Z is X, W is Y
+		move_validate(BoardID, coordinate(X,Y)), move_cords(BoardID, IsGhost, coordinate(Z,W), coordinate(X,Y)), Z is X, W is Y
 	 ).
 
 single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
@@ -689,7 +739,7 @@ staticval(Board, Val):-
 	game_level(Level),
 	max_biscits(Max),
 	game_stat(Board, _, P, G1, G2, G3),
-	biscits(Biscits, _, _, _),
+	biscits(Board, Biscits, _, _, _),
 	(
 		Biscits = Max, Val is 1000, !
 		; 
