@@ -623,11 +623,8 @@ copy_boards(Board1,Board2):-
 	copy_boards_line(Board1, Board2, coordinate(1,1)).
 
 move_cords(BoardID, IsGhost, coordinate(OrigX, OrigY), coordinate(X, Y)):-
-	IsGhost, 
-	(
-		
-		)
-	retract(slot(BoardID, coordinate(OrigX, OrigY), Origin)), retract(slot(BoardID, coordinate(X, Y), New)),assert(slot(BoardID, coordinate( X, Y), Origin)),
+	retract(slot(BoardID, coordinate(OrigX, OrigY), Origin)), retract(slot(BoardID, coordinate(X, Y), New)),
+	assert(slot(BoardID, coordinate( X, Y), Origin)),
 	(
 		IsGhost,(
 				game_stat(BoardID, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
