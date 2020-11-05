@@ -23,8 +23,7 @@
 :- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord), BoardID = 0 is game board.
 :- dynamic game_level/1.     % numerator for difining the game level.
 :- dynamic biscits/5.        % BoardID,biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
-:- dynamic def_board/1.  	% saves last saved board -> 0 is the original board.
-:- dynamic max_biscits/1  	% max game score
+:- dynamic max_biscits/1.  	% max game score
 /*****************************
 * List of clues for the game *
 *****************************/
@@ -50,7 +49,7 @@ pacman:-
 	cleanup,
 	initiate_board,
 	initiate_game,
-	print_board(1),
+	print_board(0),
 	select_play,
 	cleanup,
 	!.
@@ -100,7 +99,7 @@ select_level:-
 	 assert(game_level(TempLevel)),
 	 write('OK, lets DO THIS!'), nl,
 	 write('At any time choose e to exit the game.'), nl,
-	 play_pacman(1)) ;
+	 play_pacman(0)) ;
 	write('Illegal Input, Pick Again:'), nl, fail),
 	nl.
 
@@ -116,7 +115,7 @@ play_pacman(BoardNo):-
 	write('Select where to move(l,r,u,d):'), nl,
 	read(Move),
 	not(check_exit(BoardNo,Move)),
-	(   move(BoardNo,Move),
+	(   move(BoardNo, Move),
 	    print_board(BoardNo),
 	    print_score(BoardNo),
 	    biscits(BoardNo,Val,_,_,_),
@@ -424,8 +423,8 @@ initiate_diagonal_empty_cells(BoardNo,From,To,Column):-
 * ***********************************************************/
 
 initiate_game:-
-	assert(game_stat(1,0,coordinate(11,5),coordinate(1,20),coordinate(12,20),coordinate(21,20))),
-
+	assert(game_stat(0,0,coordinate(11,5),coordinate(1,20),coordinate(12,20),coordinate(21,20))),
+	game_stat(BoardNo,_, _, _, _, _), write(BoardNo), nl,
 	retract(slot(BoardNo,coordinate(11,5),_)),
 	assert(slot(BoardNo,coordinate(11,5),'P')),
 
@@ -503,7 +502,7 @@ ligal_place(BoardID, IsPac, coordinate(X,Y)):-
 	(
 		IsPac, not(member(Val,['\u25A0','G'])),!
 		;
-		not(IsPac), not(member(Val,['\u25A0','P']), !
+		not(IsPac), not(member(Val,['\u25A0','P'])), !
 	).
 
 ligal_cords(coordinate(X,Y)):-
@@ -511,13 +510,23 @@ ligal_cords(coordinate(X,Y)):-
 	X >=1,
 	Y =< 20,
 	Y >=1,
+	write(X), nl, write(Y)
+	.
 move_validate(BoardNo, IsPac,coordinate(NewX,NewY)):-
 	ligal_cords(coordinate(NewX,NewY)),
-	ligal_place(BoardNo, IsPac,NewX, NewY).
+	ligal_place(BoardNo, IsPac, coordinate( NewX, NewY))
+	.
+move_validate(BoardNo, Move):-
+	game_stat(BoardNo,Score,coordinate(Xcord,Ycord),_,_,_),
+	write(BoardNo), nl,
+	directions(Move,X,Y),
+	NewX is Xcord + X,
+	NewY is Ycord + Y,
+	write(NewX), nl, write(NewY),
+	move_validate(BoardNo, true, coordinate(NewX,NewY)).
 
-
-
-move(BoardNo,Move):-
+move(BoardNo, Move):-
+	write(Move), nl,
 	move_validate(BoardNo,Move),!
 	,
 	make_move(BoardNo,Move)
@@ -528,11 +537,11 @@ move(BoardNo,Move):-
 
 make_move(BoardNo,Move):-
 	retract(game_stat(BoardNo,Score,coordinate(Xcord,Ycord),Ghost1,Goast2,Ghoast3)),
-	move(Move,X,Y),
+	directions(Move,X,Y),
 	NewX is Xcord + X,
 	NewY is Ycord + Y,
 	retract(slot(BoardNo,coordinate(NewX,NewY),Val)),
-	score(Val,AddScore),
+	scores(Val,AddScore),
 	NewScore is Score + AddScore,
 	assert(game_stat(BoardNo,NewScore,coordinate(NewX,NewY),Ghost1,Goast2,Ghoast3)),
 	assert(slot(BoardNo,coordinate(NewX,NewY),'P')),
@@ -543,6 +552,219 @@ make_move(BoardNo,Move):-
 	NewVal2 is Val2 -1,
 	assert(biscits(BoardNo, NewVal2,_,_,_))
 	.
+
+%%
+%%
+%%
+copy_boards_row(Board1,Board2, coordinate(X, Y)):- % copies each row it recieves
+	ligal_cords(coordinate(X, Y)),
+	retract(slot(Board1, coordinate( X,Y), _)), slot(Board2, coordinate( X,Y), New),
+	assert(slot(Board1, coordinate( X,Y), New)),
+	X is X+1, copy_boards_row(Board1,Board2, coordinate(X, Y))
+	.
+
+copy_boards_line(Board1,Board2, coordinate(X, Y)):- % runs on each colum, and copies each row using external func
+	ligal_cords(coordinate(X, Y)),
+	copy_boards_row(Board1, Board2, coordinate(X, Y)), 
+	Y is Y+1, copy_boards_line(Board1,Board2, coordinate(X, Y)) 
+	. 
+
+copy_boards(Board1,Board2):-
+	game_stat(Board1, S, P, G1,G2,G3), biscits(Board1, B, G1, G2, G3),
+	retract(game_stat(Board2, _, _, _,_,_)) ,assert(game_stat(Board2, S, P, G1,G2,G3)),
+	retract(biscits(Board2, _, _, _, _)), assert(biscits(Board2,B, G1, G2, G3)),
+	copy_boards_line(Board1, Board2, coordinate(1,1))
+	.
+
+move_cords(BoardID, IsGhost, coordinate(OrigX, OrigY), coordinate(X, Y)):-
+	retract(slot(BoardID, coordinate(OrigX, OrigY), Origin)), retract(slot(BoardID, coordinate(X, Y), New)),
+	assert(slot(BoardID, coordinate( X, Y), Origin)),
+	(
+		IsGhost,(
+				game_stat(BoardID, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
+				(
+					OrigX=X1, OrigY = Y1, (
+						biscits(BoardID, _, 1, _, _), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
+						;
+						biscits(BoardID, _, 0, _, _)
+						), (
+							New= 'o', retract(biscit(BoardID, B,G1, G2, G3)), assert(biscit(BoardID, B, 1, G2, G3))
+							;
+							New = ' '
+						)
+					;
+					OrigX=X2, OrigY = Y2, 
+					(
+						biscits(BoardID, _, _, 1, _), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
+						;
+						biscits(BoardID, _, _, 0, _)
+					),
+					(
+						New= 'o', retract(biscit(BoardID, B,G1, G2, G3)), assert(biscit(BoardID, B,G1, 1, G3))
+					;
+						New = ' '
+					)
+					;
+					OrigX=X3, OrigY = Y3, 
+					(
+						biscits(BoardID, _, _, _, 1), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
+						;
+						biscits(BoardID, _, _, _, 0)
+					),
+					(
+						New= 'o', retract(biscit(BoardID,B, G1, G2, G3)), assert(biscit(BoardID,B, G1, G2, 1))
+						;
+						New = ' '
+					)
+				)
+			), !
+		;
+		not(IsGhost),
+		(
+			assert(slot(BoardID, coordinate(OrigX, OrigY), ' ')),
+			(
+					New = ' '
+					;
+					New = 'o', retract(biscits(BoardID, Val, G1,G2,G3)), Val is Val-1, assert(biscits(BoardID, Val, G1,G2,G3)),
+					retract(game_stat(BoardId, Score, P, G1, G2,G3)),
+					scores('o', R), Score is Score+R,
+				 	assert(game_stat(BoardId, Score, P, G1, G2,G3))
+			)
+		)
+	)
+	.
+
+possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
+	Z is X, W is Y,
+	directions(_, XAdder, YAdder), X is X+ XAdder, Y is Y + YAdder, % choosing a direction.
+	(
+		not(IsGhost), not(ligal_place(BoardID, coordinate(X, Y))), ! %% if there is a wall there, not out of bound use the original cords
+		; 
+		move_validate(BoardID, coordinate(X,Y)), move_cords(BoardID, IsGhost, coordinate(Z,W), coordinate(X,Y)), Z is X, W is Y
+	 ).
+
+single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
+	game_stat(BoardID, _, P, G1, G2,G3),
+	retract(next_board_no(NewBoard)), NewBoard is NewBoard+1,
+	copy_boards(BoardID, NewBoard),
+	assert(next_board_no(NewBoard)),
+	 (
+		IsGhost, (possible_move(NewBoard, IsGhost,G1, _), possible_move(NewBoard, IsGhost,G2, _),possible_move(NewBoard, IsGhost,G3, _)),
+	 	PossibleMove is NewBoard, ! % returns a list of lists each containing original and new cords.
+		;
+		( possible_move(NewBoard, IsGhost, P, _) ), PossibleMove is NewBoard
+	). 
+ 
+moves(BoardID, IsGhostTurn, AllPossibleMoves):-
+	setof(R, single_move(BoardID, IsGhostTurn, R), AllPossibleMoves). % returns all possible moves in this turn
+
+ghost_avreage_dis(Board, Dis):-
+	game_stat(Board, _, P, G1, G2, G3),
+	Dis is float((abs(float((P-G1)/2))+abs(float((P-G2)/2))+abs(float((P-G3)/2)))/3)
+	.
+ghost_rectangel(Board, Rec):-
+	game_stat(Board, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
+	Rec is 0.5*abs(X1*(Y3-Y2)+X2(Y1-Y3)+X3(Y2-Y1))
+	.
+
+pacman_in_cannal_step(Board, coordinate(X, Y)):-
+	turn_num(TurnsLeft), TurnsLeft>=0,
+	TurnsTaken is 0,
+	game_stat(Board, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
+	(
+		(X=X1, Y=Y1; X =X2, Y = Y2 ; X = X3, Y = Y3), !
+		;
+		W is X+1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(W, Y))
+		;
+		W is X-1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(W, Y))
+		;
+		Z is Y+1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(X, Z))
+		;
+		Z is Y-1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
+		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(X, Z))
+	).
+pacman_in_cannal(Board, IsInCannal):-
+	game_stat(Board, _, P, _, _, _),
+	pacman_in_cannal_step(Board, P), IsInCannal = 1, !
+	;
+	IsInCannal = 0
+	.
+
+staticval(Board, Val):-
+	game_level(Level),
+	max_biscits(Max),
+	game_stat(Board, _, P, G1, G2, G3),
+	biscits(Board, Biscits, _, _, _),
+	(
+		Biscits = 0, Val is 1000, !
+		; 
+		(P = G1 ; P= G2; P = G3), Val is -1000, !
+		;
+		Level=1, ghost_avreage_dis(Board, Dis), Val is 0.6*(Max-Biscits)+4*Dis, !
+		;
+		Level=2,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec), Val is 0.6*Score +3*Dis - Rec, !
+		;
+		Level=3,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec),pacman_in_cannal(Board, IsInCannal) Val is 0.6*Score +3*Dis - Rec -100*IsInCannal, !
+	).
+%% alphabeta
+
+ghosts_to_move(pos(_,1,_)). % true iff it's MAX turn to move  (x player)
+pacman_to_move(pos(_,2,_)). % true iff it's MIN turn to move  (o player)
+
+
+
+
+alphabeta(CurrentPos,Alpha,Beta,BestSuccessorPos,Val,DepthLevel):-
+
+	(
+	   (
+              (nonvar(Alpha),nonvar(Beta));
+              (Alpha is -999999, Beta is 999999) % init +-infinity
+            ),
+	 game_level(Level),
+         MaxDepth is Level + 2,
+         moves(CurrentPos,PosList,DepthLevel,MaxDepth),!,
+	 NewDepthLevel is DepthLevel+1,	% update depth level
+	 boundedbest(PosList,Alpha,Beta,BestSuccessorPos,Val,NewDepthLevel)
+	)
+	;
+	staticval(CurrentPos,Val). % terminal seatchtree node - evaluate directly
+
+boundedbest([Pos|PosList],Alpha,Beta,GoodPos,GoodVal,DepthLevel):-
+	alphabeta(Pos,Alpha,Beta,_,Val,DepthLevel),
+	goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel).
+
+goodenough([],_,_,Pos,Val,Pos,Val,_):- !.	% No other candidate
+
+goodenough(_,Alpha,Beta,Pos,Val,Pos,Val,_):-
+	ghosts_to_move(Pos),Val > Beta, !          % Maximizer attained upper bound
+	;
+	pacman_to_move(Pos),Val < Alpha, !.        % Minimizer attained lower bound
+
+goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel):-
+	newbounds(Alpha,Beta,Pos,Val,NewAlpha,NewBeta),   % Refine bounds
+	boundedbest(PosList,NewAlpha,NewBeta,Pos1,Val1,DepthLevel),
+	betterof(Pos,Val,Pos1,Val1,GoodPos,GoodVal).
+
+/* define new interval by 2 last arguments that is narrower or equal to old interval */
+newbounds(Alpha,Beta,Pos,Val,Val,Beta):-
+	ghosts_to_move(Pos),Val > Alpha, !.       % Maximizer increased lower bound
+
+newbounds(Alpha,Beta,Pos,Val,Alpha,Val):-
+	pacman_to_move(Pos),Val < Beta, !.         % Minimizer decreased upper bound
+
+newbounds(Alpha,Beta,_,_,Alpha,Beta).      % Otherwise bounds unchanged
+
+% betterof(Pos,Val,Pos1,Val1,Pos,Val)     % Pos better than Pos1
+betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
+	ghosts_to_move(Pos),Val > Val1, !
+	;
+	pacman_to_move(Pos), Val < Val1, !.
+
+betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 
 /*
@@ -607,201 +829,3 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 */
-copy_boards_row(Board1,Board2, coordinate(X, Y)):- % copies each row it recieves
-	ligal_cords(coordinate(X, Y)),
-	retract(slot(Board1, X,Y), _), retract(slot(Board2, X, Y), New),
-	assert(slot(Board1, X, Y), New), assert(slot(Board2, X, Y), New),
-	X is X+1, copy_boards_row(Board1,Board2, coordinate(X, Y)).
-
-copy_boards_line(Board1,Board2, coordinate(X, Y)):- % runs on each colum, and copies each row using external func
-	ligal_cords(coordinate(X, Y)),
-	copy_boards_row(Board1, Board2, coordinate(X, Y)), 
-	Y is Y+1, copy_boards_line(Board1,Board2, coordinate(X, Y)) . 
-
-copy_boards(Board1,Board2):-
-	retract(game_stat(Board1, S, P, G1,G2,G3)), assert(game_stat(Board2, S, P, G1,G2,G3)), assert(game_stat(Board1, S, P, G1,G2,G3)),
-	copy_boards_line(Board1, Board2, coordinate(1,1)).
-
-move_cords(BoardID, IsGhost, coordinate(OrigX, OrigY), coordinate(X, Y)):-
-	retract(slot(BoardID, coordinate(OrigX, OrigY), Origin)), retract(slot(BoardID, coordinate(X, Y), New)),
-	assert(slot(BoardID, coordinate( X, Y), Origin)),
-	(
-		IsGhost,(
-				game_stat(BoardID, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
-				(
-					OrigX=X1, OrigY = Y1, (
-						biscits(BoardID, _, 1, _, _), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
-						;
-						biscits(BoardID, _, 0, _, _)
-						), (
-							New= 'o', retract(biscit(BoardID, B,G1, G2, G3)), assert(biscit(BoardID, B, 1, G2, G3))
-							;
-							New = ' '
-						)
-					;
-					OrigX=X2, OrigY = Y2, 
-					(
-						biscits(BoardID, _, _, 1, _), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
-						;
-						biscits(BoardID, _, _, 0, _)
-					),
-					(
-						New= 'o', retract(biscit(BoardID, B,G1, G2, G3)), assert(biscit(BoardID, B,G1, 1, G3))
-					;
-						New = ' '
-					)
-					;
-					OrigX=X3, OrigY = Y3, 
-					(
-						biscits(BoardID, _, _, _, 1), assert(slot(BoardID, coordinate(OrigX, OrigY), 'o'))
-						;
-						biscits(BoardID, _, _, _, 0)
-					),
-					(
-						New= 'o', retract(biscit(BoardID,B, G1, G2, G3)), assert(biscit(BoardID,B, G1, G2, 1))
-						;
-						New = ' '
-					)
-				)
-			), !
-		;
-		not(IsGhost),
-		(
-			assert(slot(BoardID, coordinate(OrigX, OrigY), ' ')),
-			(
-					New = ' '
-					;
-					New = 'o', retract(biscits(BoardID, Val, G1,G2,G3)), Val is Val-1, assert(biscits(BoardID, Val, G1,G2,G3))
-			)
-		)
-	)
-	.
-
-possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
-	Z is X, W is Y,
-	directions(Dir, XAdder, YAdder), % choosing a direction.
-	(
-		X is X+ XAdder, Y is Y + YAdder,
-		not(IsGhost), not(ligal_place(BoardID, coordinate(X, Y))), !; %% if there is a wall there, not out of bound use the original cords
-		move_validate(BoardID, coordinate(X,Y)), move_cords(BoardID, IsGhost, coordinate(Z,W), coordinate(X,Y)), Z is X, W is Y
-	 ).
-
-single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
-	retract(game_stat(BoardID, _, P, G1, G2,G3)), retract(def_board(NewBoard)), NewBoard is NewBoard+1,
-	copy_boards(BoardID, NewBoard), assert(def_board(NewBoard)),
-	 (
-		IsGhost, (possible_move(NewBoard, IsGhost,G1, N_G1), possible_move(NewBoard, IsGhost,G2, N_G2),possible_move(NewBoard, IsGhost,G3, N_G3)),
-	 	PossibleMove is NewBoard, ! % returns a list of lists each containing original and new cords.
-		;
-		( possible_move(NewBoard, IsGhost, P, N_P) ), PossibleMove is NewBoard
-	). 
- 
-moves(BoardID, IsGhostTurn, AllPossibleMoves):-
-	setof(R, single_move(BoardID, IsGhostTurn, R), AllPossibleMoves). % returns all possible moves in this turn
-
-ghost_avreage_dis(Board, Dis):-
-	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
-	Dis is float((abs(float((P-G1)/2))+abs(float((P-G2)/2))+abs(float((P-G3)/2)))/3)
-	.
-ghost_rectangel(Board, Rec):-
-	game_stat(Board, _, _, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3)),
-	Rec is 0.5*abs(X1*(Y3-Y2)+X2(Y1-Y3)+X3(Y2-Y1)).
-
-pacman_in_cannal_step(Board, coordinate(X, Y)):-
-	retract(turn_num(TurnsLeft)), TurnsLeft>=0, assert(turn_num(TurnsLeft)), TurnsTaken is 0,
-	retract(game_stat(Board, Score, P, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3))), assert(game_stat(Board, Score, P, coordinate(X1, Y1), coordinate(X2, Y2), coordinate(X3, Y3))),
-	(
-		(X=X1, Y=Y1; X =X2, Y = Y2 ; X = X3, Y = Y3)
-		;
-		W is X+1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
-		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(W, Y))
-		;
-		W is X-1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
-		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(W, Y))
-		;
-		Z is Y+1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
-		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(X, Z))
-		;
-		Z is Y-1, not_wall(Board, coordinate(W, Y)), retract(turn_num(TurnsLeft)), TurnsLeft is TurnsLeft-TurnsTaken, assert(turn_num(TurnsLeft)),
-		TurnsTaken is TurnsTaken+1, pacman_in_cannal_step(Board, coordinate(X, Z))
-	).
-pacman_in_cannal(Board, IsInCannal):-
-	retract(game_stat(Board, Score, P, G1, G2, G3)), assert(game_stat(Board, Score, P, G1, G2, G3)),
-	pacman_in_cannal_step(Board, P), IsInCannal = 1, !
-	;
-	IsInCannal = 0
-	.
-
-staticval(Board, Val):-
-	game_level(Level),
-	max_biscits(Max),
-	game_stat(Board, _, P, G1, G2, G3),
-	biscits(Board, Biscits, _, _, _),
-	(
-		Biscits = Max, Val is 1000, !
-		; 
-		(P = G1 ; P= G2; P = G3), Val is -1000, !
-		;
-		Level=1, ghost_avreage_dis(Board, Dis), Val is 0.6*Score+4*Dis, !
-		;
-		Level=2,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec), Val is 0.6*Score +3*Dis - Rec, !
-		;
-		Level=3,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec),pacman_in_cannal(Board, IsInCannal) Val is 0.6*Score +3*Dis - Rec -100*IsInCannal, !
-	).
-%% alphabeta
-
-ghosts_to_move(pos(_,1,_)). % true iff it's MAX turn to move  (x player)
-pacman_to_move(pos(_,2,_)). % true iff it's MIN turn to move  (o player)
-
-
-
-
-alphabeta(CurrentPos,Alpha,Beta,BestSuccessorPos,Val,DepthLevel):-
-
-	(
-	   (
-              (nonvar(Alpha),nonvar(Beta));
-              (Alpha is -999999, Beta is 999999) % init +-infinity
-            ),
-	 game_level(Level),
-         MaxDepth is Level + 2,
-         moves(CurrentPos,PosList,DepthLevel,MaxDepth),!,
-	 NewDepthLevel is DepthLevel+1,	% update depth level
-	 boundedbest(PosList,Alpha,Beta,BestSuccessorPos,Val,NewDepthLevel)
-	)
-	;
-	staticval(CurrentPos,Val). % terminal seatchtree node - evaluate directly
-
-boundedbest([Pos|PosList],Alpha,Beta,GoodPos,GoodVal,DepthLevel):-
-	alphabeta(Pos,Alpha,Beta,_,Val,DepthLevel),
-	goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel).
-
-goodenough([],_,_,Pos,Val,Pos,Val,_):- !.	% No other candidate
-
-goodenough(_,Alpha,Beta,Pos,Val,Pos,Val,_):-
-	ghosts_to_move(Pos),Val > Beta, !          % Maximizer attained upper bound
-	;
-	pacman_to_move(Pos),Val < Alpha, !.        % Minimizer attained lower bound
-
-goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel):-
-	newbounds(Alpha,Beta,Pos,Val,NewAlpha,NewBeta),   % Refine bounds
-	boundedbest(PosList,NewAlpha,NewBeta,Pos1,Val1,DepthLevel),
-	betterof(Pos,Val,Pos1,Val1,GoodPos,GoodVal).
-
-/* define new interval by 2 last arguments that is narrower or equal to old interval */
-newbounds(Alpha,Beta,Pos,Val,Val,Beta):-
-	ghosts_to_move(Pos),Val > Alpha, !.       % Maximizer increased lower bound
-
-newbounds(Alpha,Beta,Pos,Val,Alpha,Val):-
-	pacman_to_move(Pos),Val < Beta, !.         % Minimizer decreased upper bound
-
-newbounds(Alpha,Beta,_,_,Alpha,Beta).      % Otherwise bounds unchanged
-
-% betterof(Pos,Val,Pos1,Val1,Pos,Val)     % Pos better than Pos1
-betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
-	ghosts_to_move(Pos),Val > Val1, !
-	;
-	pacman_to_move(Pos), Val < Val1, !.
-
-betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
-
