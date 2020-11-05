@@ -46,11 +46,12 @@ scores(' ',0).
 *****************************************************/
 moves_ur_test:-
 	initiate_board,
-	moves(0, true, AllBoards),
-	print_board_list(AllBoards).
+	initiate_game, !,
+	write("x: "),
+	possible_move(0, true, coordinate(1,20), coordinate(X,Y)), write(X), !.
 
 print_board_list([Board|Boards]):-
-	print_board(Board).
+	print_board(Board), print_board_list(Boards).
 print_board_list([]).
 
 pacman:-
@@ -649,17 +650,19 @@ move_cords(BoardID, IsGhost, coordinate(OrigX, OrigY), coordinate(X, Y)):-
 	.
 
 possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
-	Z is X, W is Y,
-	directions(_, XAdder, YAdder), X is X+ XAdder, Y is Y + YAdder, % choosing a direction.
+	write("Y:"), write(Y),write("X:"), write(X), member(Dir, [l,r,u,d]),
+	directions(Dir, XAdder, YAdder),
+	 Z is (X+ XAdder), W is (Y + YAdder), nl ,write(Z), write(" new chords "),write(W),  % choosing a direction.
 	(
-		not(IsGhost), not(ligal_place(BoardID, coordinate(X, Y))), ! %% if there is a wall there, not out of bound use the original cords
+		not(IsGhost), not(ligal_place(BoardID, coordinate(Z, W))), ! %% if there is a wall there, not out of bound use the original cords
 		; 
-		move_validate(BoardID, coordinate(X,Y)), move_cords(BoardID, IsGhost, coordinate(Z,W), coordinate(X,Y)), Z is X, W is Y
+		move_validate(BoardID, coordinate(Z,W)), write("passed move Validate"),move_cords(BoardID, IsGhost, coordinate(X,Y), coordinate(Z, W)), Z is X, W is Y
 	 ).
 
 single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
 	game_stat(BoardID, _, P, G1, G2,G3),
 	retract(next_board_no(NewBoard)), NewBoard is NewBoard+1,
+	write("board_num: "), write(NewBoard), nl,
 	copy_boards(BoardID, NewBoard),
 	assert(next_board_no(NewBoard)),
 	 (
@@ -721,7 +724,7 @@ staticval(Board, Val):-
 		;
 		Level=2,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec), Val is 0.6*Score +3*Dis - Rec, !
 		;
-		Level=3,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec),pacman_in_cannal(Board, IsInCannal) Val is 0.6*Score +3*Dis - Rec -100*IsInCannal, !
+		Level=3,ghost_avreage_dis(Board, Dis),ghost_rectangel(Board, Rec),pacman_in_cannal(Board, IsInCannal), Val is 0.6*Score +3*Dis - Rec -100*IsInCannal, !
 	).
 %% alphabeta
 
@@ -843,3 +846,4 @@ betterof(Pos,Val,_,Val1,Pos,Val):-      % Pos better than Pos1
 betterof(_,_,Pos1,Val1,Pos1,Val1).         % Otherwise Pos1 better
 
 */
+
