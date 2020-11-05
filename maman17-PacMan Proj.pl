@@ -44,7 +44,7 @@ scores(' ',0).
 /*****************************************************
 * cleanup - clear memory from all dynamic predicates *
 *****************************************************/
-boarc_uristic_testing:-
+moves_ur_test:-
 	initiate_board,
 	moves(0, true, AllBoards),
 	print_board_list(AllBoards).
