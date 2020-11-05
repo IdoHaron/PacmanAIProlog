@@ -44,6 +44,14 @@ scores(' ',0).
 /*****************************************************
 * cleanup - clear memory from all dynamic predicates *
 *****************************************************/
+boarc_uristic_testing:-
+	initiate_board,
+	moves(0, true, AllBoards),
+	print_board_list(AllBoards).
+
+print_board_list([Board|Boards]):-
+	print_board(Board).
+print_board_list([]).
 
 pacman:-
 	cleanup,
@@ -123,6 +131,12 @@ play_pacman(BoardNo):-
 		(
 			Val =0, print('you won!'),!
 			;
+			play_pacman(BoardNo)
+		)
+		;
+		(
+			print_board(BoardNo),
+			print_score(BoardNo),
 			play_pacman(BoardNo)
 		)
 	).
@@ -522,7 +536,7 @@ move_validate(BoardNo, Move):-
 	directions(Move,X,Y),
 	NewX is Xcord + X,
 	NewY is Ycord + Y,
-	write(NewX), nl, write(NewY),
+	write("chords: "), write(NewX), write(","), write(NewY), nl,
 	move_validate(BoardNo, true, coordinate(NewX,NewY)).
 
 move(BoardNo, Move):-
