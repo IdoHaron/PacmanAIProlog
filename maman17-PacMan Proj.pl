@@ -22,7 +22,7 @@
 :- dynamic player_stuck/1.   % flag indicating this player has no legal moves.
 :- dynamic game_stat/6.	     % game_stat(BoardID, score, pacman_cord, ghost1_cord, ghost2_cord, ghost3_cord), BoardID = 0 is game board.
 :- dynamic game_level/1.     % numerator for difining the game level.
-:- dynamic biscits/5.        % BoardID,biscits(Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
+:- dynamic biscits/5.        % biscits(BoardID,Number of biscits on board, ghost1 on biscit, ghost2 on biscit, ghost3 on biscit).
 :- dynamic max_biscits/1.  	% max game score
 /*****************************
 * List of clues for the game *
@@ -656,7 +656,7 @@ possible_move(BoardID, IsGhost, coordinate(X, Y), coordinate(Z, W)):-
 	(
 		not(IsGhost), not(ligal_place(BoardID, coordinate(Z, W))), ! %% if there is a wall there, not out of bound use the original cords
 		; 
-		move_validate(BoardID, coordinate(Z,W)), write("passed move Validate"),move_cords(BoardID, IsGhost, coordinate(X,Y), coordinate(Z, W)), Z is X, W is Y
+		move_validate(BoardID, true, coordinate(Z,W)), nl,write("passed move Validate"),move_cords(BoardID, IsGhost, coordinate(X,Y), coordinate(Z, W)), Z is X, W is Y
 	 ).
 
 single_move(BoardID, IsGhost, PossibleMove):- %returns a single ligal move
@@ -827,7 +827,7 @@ goodenough(PosList,Alpha,Beta,Pos,Val,GoodPos,GoodVal,DepthLevel,MaxDepth,Level)
 	boundedbest(PosList,NewAlpha,NewBeta,Pos1,Val1,DepthLevel,MaxDepth,Level),
 	betterof(Pos,Val,Pos1,Val1,GoodPos,GoodVal).
 
-/* define new interval by 2 last arguments that is narrower or equal to old interval */
+define new interval by 2 last arguments that is narrower or equal to old interval */
 /*
 newbounds(Alpha,Beta,Pos,Val,Val,Beta):-
 	min_to_move(Pos),Val > Alpha, !.       % Maximizer increased lower bound
